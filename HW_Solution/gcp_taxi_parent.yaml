@@ -1,0 +1,54 @@
+id: gcp_taxi_parent
+namespace: company.team
+
+inputs:
+  - id: taxi
+    type: SELECT
+    values: [yellow, green]
+    defaults: green
+  - id: years
+    type: ARRAY
+    itemType: STRING
+    defaults: ["2019", "2020", "2021"]
+  - id: months
+    type: ARRAY
+    itemType: STRING
+    defaults: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+
+tasks:
+  - id: iterate_years
+    type: io.kestra.plugin.core.flow.ForEach
+    values: "{{ inputs.years }}"
+    tasks:
+      - id: iterate_months
+        type: io.kestra.plugin.core.flow.ForEach
+        values: "{{ inputs.months }}"
+        tasks:
+          - id: call_child_flow
+            type: io.kestra.plugin.core.flow.Subflow
+            flowId: gcp_taxi_child
+            namespace: company.team
+            wait: true
+            allowFailure: true
+            inputs:
+              taxi: "{{ inputs.taxi }}"
+              year: "{{ parent.taskrun.value }}"
+              month: "{{ taskrun.value }}"
+
+          - id: monthly_log
+            type: io.kestra.plugin.core.log.Log
+            # Added file_size to the message
+            message: |
+              STATS | Taxi: {{ inputs.taxi }} | Date: {{ parent.taskrun.value }}-{{ taskrun.value }} 
+              Rows: {{ outputs.call_child_flow[taskrun.value].outputs.row_count ?: 0 }} 
+              Size: {{ outputs.call_child_flow[taskrun.value].outputs.file_size ?: 'N/A' }}
+
+      - id: yearly_total_log
+        type: io.kestra.plugin.core.log.Log
+        message: "Year {{ taskrun.value }} Total: {{ outputs.call_child_flow | values | map(attribute='outputs.row_count') | sum }} rows."
+
+
+pluginDefaults:
+  - type: io.kestra.plugin.core.flow.Subflow
+    values:
+      transmitFailed: true
