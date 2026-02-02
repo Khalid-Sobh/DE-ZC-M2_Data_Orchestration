@@ -35,18 +35,60 @@ tasks:
               year: "{{ parent.taskrun.value }}"
               month: "{{ taskrun.value }}"
 
-          - id: monthly_log
-            type: io.kestra.plugin.core.log.Log
-            # Added file_size to the message
-            message: |
-              STATS | Taxi: {{ inputs.taxi }} | Date: {{ parent.taskrun.value }}-{{ taskrun.value }} 
-              Rows: {{ outputs.call_child_flow[taskrun.value].outputs.row_count ?: 0 }} 
-              Size: {{ outputs.call_child_flow[taskrun.value].outputs.file_size ?: 'N/A' }}
+      # ALIGNMENT FIXED: These run once per year, after all months finish
+      - id: calculate_yearly_total
+        type: io.kestra.plugin.scripts.shell.Commands
+        taskRunner:
+          type: io.kestra.plugin.core.runner.Process
+        inputFiles:
+          data.json: "{{ outputs.call_child_flow | json }}"
+          main.py: |
+            import json
+            import sys
+
+            def deep_sum(obj, key):
+                """Recursively find all instances of a key and sum their values."""
+                total = 0
+                if isinstance(obj, dict):
+                    for k, v in obj.items():
+                        if k == key and v is not None:
+                            try:
+                                total += int(v)
+                            except:
+                                pass
+                        else:
+                            total += deep_sum(v, key)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        total += deep_sum(item, key)
+                return total
+
+            try:
+                with open('data.json') as f:
+                    data = json.load(f)
+                
+                # LOG THE DATA: This helps us see the structure if it fails again
+                # sys.stderr.write(f"DEBUG DATA: {json.dumps(data)}\n")
+
+                total = deep_sum(data, 'row_count')
+                
+                # Ensure no spaces at the start of the line
+                sys.stdout.write('::{"outputs": {"yearly_total": ' + str(total) + '}}::\n')
+                sys.stdout.flush()
+            except Exception as e:
+                sys.stderr.write(f"PYTHON ERROR: {str(e)}\n")
+                sys.stdout.write('::{"outputs": {"yearly_total": 0}}::\n')
+        commands:
+          - python main.py
 
       - id: yearly_total_log
         type: io.kestra.plugin.core.log.Log
-        message: "Year {{ taskrun.value }} Total: {{ outputs.call_child_flow | values | map(attribute='outputs.row_count') | sum }} rows."
-
+        message: |
+          ---------------------------------------
+          Taxi Type: {{ inputs.taxi }}
+          YEARLY REPORT: {{ taskrun.value }}
+          Total Rows: {{ outputs.calculate_yearly_total[taskrun.value].vars.yearly_total }}
+          --------------------------------------- 
 
 pluginDefaults:
   - type: io.kestra.plugin.core.flow.Subflow
