@@ -2,6 +2,12 @@
 
 Data Orchestration project using Kestra for orchestrating NYC Taxi data pipelines on Google Cloud Platform.
 
+## Homework Reference
+
+This project is a solution for the Data Engineering Zoomcamp Module 2: Workflow Orchestration homework assignment.
+
+**Assignment Details:** [Data Engineering Zoomcamp - Workflow Orchestration Homework](https://github.com/DataTalksClub/data-engineering-zoomcamp/blob/main/cohorts/2026/02-workflow-orchestration/homework.md)
+
 ## Overview
 
 This project demonstrates a complete data orchestration solution using Kestra, featuring:
@@ -74,6 +80,20 @@ Infrastructure setup for running Kestra:
 #### **service-account.json**
 GCP service account credentials (not included for security - add your own)
 
+#### **c06_gcp_kv.yaml** - Configure Key-Value Store
+Sets up required KV pairs with GCP configuration:
+- `GCP_PROJECT_ID`: Your GCP project ID (e.g., `kestra-sandbox-486015`)
+- `GCP_LOCATION`: GCP region (e.g., `europe-west1`)
+- `GCP_BUCKET_NAME`: Cloud Storage bucket name (must be globally unique)
+- `GCP_DATASET`: BigQuery dataset name (e.g., `zoomcamp`)
+
+**Before running:** Replace placeholder values with your own GCP configuration.
+
+#### **07_gcp_setup.yaml** - Provision GCP Resources
+Automatically creates required GCP resources:
+- **Cloud Storage Bucket**: Creates a regional GCS bucket if it doesn't exist
+- **BigQuery Dataset**: Creates a BigQuery dataset if it doesn't exist
+
 ## Setup & Execution
 
 ### Prerequisites
@@ -100,21 +120,19 @@ GCP service account credentials (not included for security - add your own)
 
 4. Access Kestra UI at `http://localhost:8080`
 
-### Creating Kestra Key-Value Store
+### Workflow Execution Order
 
-Before running workflows, configure GCP settings in Kestra KV store:
-- `GCP_PROJECT_ID`: Your GCP project ID
-- `GCP_BUCKET_NAME`: Cloud Storage bucket name
-- `GCP_DATASET`: BigQuery dataset name
-- `GCP_LOCATION`: GCP region (e.g., "US")
-- `GCP_SERVICE_ACCOUNT`: Service account JSON (stored as secret)
-
-### Running Workflows
-
-1. **Parent Workflow**: Trigger `gcp_taxi_parent` from the Kestra UI
-2. **Parameters**: Select taxi type, years, and months
-3. **Monitoring**: View execution logs and task metrics in real-time
-4. **Results**: Check yearly aggregations and file processing statistics
+1. **Run `c06_gcp_kv.yaml`**: Set all GCP configuration in Kestra KV store
+   - Replace placeholder values with your GCP project details
+   
+2. **Run `07_gcp_setup.yaml`**: Provision GCP resources
+   - Creates Cloud Storage bucket
+   - Creates BigQuery dataset
+   
+3. **Run `gcp_taxi_parent`**: Execute the main data orchestration workflow
+   - Select taxi type, years, and months
+   - Monitor execution logs and task metrics in real-time
+   - Check yearly aggregations and file processing statistics
 
 ## Workflow Logic
 
